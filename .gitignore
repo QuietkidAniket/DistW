@@ -1,0 +1,6 @@
+.vscode/
+build/
+vendor/
+workspace/
+CMakeLists.txt
+DistW _  Distributed Workspace with Hierarchical Lock Manager.pdf
