@@ -152,6 +152,24 @@ export default function EditorWorkspace() {
 
     cursorCollectionRef.current = editor.createDecorationsCollection([]);
 
+    // This is the critical block that actually sends our typing to the server!
+    editor.onDidChangeModelContent((event: any) => {
+      if (isRemoteUpdate.current) return; 
+
+      const store = useSocketStore.getState();
+      const currentActiveFile = store.activeFile;
+      const currentlyHasLock = store.activeLocks[currentActiveFile] === store.userId;
+
+      store.currentBuffer = editor.getValue();
+      
+      // If we don't have the lock, don't broadcast the changes
+      if (!currentlyHasLock) return;
+      
+      // Blast the new text to the C++ server!
+      store.sendDelta(currentActiveFile, event.changes, editor.getValue());
+    });
+
+    // The Ghost-Cursor Fix (Keep only ONE of these)
     editor.onDidChangeCursorPosition((event: any) => {
       // If the user's blinking text cursor is not physically focused inside this specific editor, 
       // completely ignore the movement. This prevents background tab loads from broadcasting (1,1).
@@ -159,13 +177,6 @@ export default function EditorWorkspace() {
         return; 
       }
 
-      const store = useSocketStore.getState();
-      if (store.activeFile) {
-        store.sendCursor(store.activeFile, event.position.lineNumber, event.position.column);
-      }
-    });
-
-    editor.onDidChangeCursorPosition((event: any) => {
       const store = useSocketStore.getState();
       if (store.activeFile) {
         store.sendCursor(store.activeFile, event.position.lineNumber, event.position.column);
