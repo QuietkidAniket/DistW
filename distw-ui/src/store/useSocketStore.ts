@@ -7,21 +7,22 @@ interface SocketState {
   currentBuffer: string;
   activeFile: string;
   
-  // NEW: Identity Tracking
   userId: string;
   clientId: string;
-  fileTree: any[]; // NEW
+  fileTree: any[]; 
 
-  createFile: (filePath: string) => void; // NEW
+  createFile: (filePath: string) => void; 
   
   connect: () => void; // Removed URL argument, we will build it internally
   disconnect: () => void;
   sendDelta: (filePath: string, changes: any[], fullText: string) => void;
   requestLock: (filePath: string, mode: 'SHARED' | 'EXCLUSIVE') => void;
   releaseLock: (filePath: string) => void; 
-  executeCode: (filePath: string, code: string) => void;
+  executeCode: (code: string, stdin: string) => void;
   setActiveFile: (filePath: string) => void;
   requestFileContent: (filePath: string) => void;
+  deleteFile: (filePath: string) => void; 
+  sendCursor: (filePath: string, row: number, col: number) => void;
 }
 
 export const useSocketStore = create<SocketState>((set, get) => ({
@@ -53,10 +54,29 @@ export const useSocketStore = create<SocketState>((set, get) => ({
       try {
         const payload = JSON.parse(event.data);
         switch (payload.type) {
-          case 'TREE_SYNC': set({ fileTree: payload.tree || [] }); break; // 🚨 Catch the tree!
-          // ... keep all your other cases (LOCK_SYNC, DELTA, etc.) ...
+          case 'TREE_SYNC': 
+            set({ fileTree: payload.tree || [] }); 
+            break;
+          case 'LOCK_SYNC': 
+            set({ activeLocks: payload.active_locks }); 
+            break;
+          case 'DELTA': 
+            window.dispatchEvent(new CustomEvent('cloud-delta', { detail: payload })); 
+            break;
+          case 'CURSOR': 
+            window.dispatchEvent(new CustomEvent('cursor-update', { detail: payload })); 
+            break;
+          case 'FILE_CONTENT': 
+            window.dispatchEvent(new CustomEvent('file-loaded', { detail: payload })); 
+            break;
+          case 'RUN_OUTPUT': 
+            window.dispatchEvent(new CustomEvent('terminal-output', { detail: payload.data })); 
+            break;
+          case 'CURSOR': window.dispatchEvent(new CustomEvent('cursor-update', { detail: payload })); break;
         }
-      } catch (err) {}
+      } catch (err) {
+        console.error("WebSocket payload error:", err);
+      }
     };
   },
 
@@ -96,9 +116,18 @@ export const useSocketStore = create<SocketState>((set, get) => ({
     if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'LOCK_RELEASE', file_path }));
   },
 
-  executeCode: (file_path, code) => {
+  executeCode: (code, stdin) => {
     const { socket } = get();
-    if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'ADMIN_RUN', file_path, code }));
+    if (socket?.readyState === WebSocket.OPEN) {
+      // Clear previous terminal output locally before running
+      window.dispatchEvent(new CustomEvent('terminal-output', { detail: '\x1b[2J\x1b[H' })); 
+      
+      socket.send(JSON.stringify({ 
+        type: 'ADMIN_RUN', 
+        code, 
+        stdin 
+      }));
+    }
   },
 
   setActiveFile: (file_path) => {
@@ -109,6 +138,26 @@ export const useSocketStore = create<SocketState>((set, get) => ({
   requestFileContent: (file_path) => {
     const { socket } = get();
     if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'FILE_REQUEST', file_path }));
+  },
+
+  deleteFile: (file_path) => {
+    const { socket } = get();
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({ type: 'FILE_DELETE', file_path }));
+    }
+  },
+  sendCursor: (file_path, row, col) => {
+    const { socket, clientId, userId } = get();
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify({
+        type: 'CURSOR',
+        client_id: clientId,
+        user_id: userId,
+        file_path,
+        row,
+        col
+      }));
+    }
   }
 
 }));

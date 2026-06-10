@@ -9,18 +9,33 @@ interface FileNode {
 }
 
 export default function FileExplorer() {
-  const { activeLocks, activeFile, setActiveFile, fileTree, createFile } = useSocketStore();
+  const { activeLocks, activeFile, setActiveFile, fileTree, createFile, requestLock, deleteFile } = useSocketStore();
   const [newFileName, setNewFileName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
 
   const handleCreate = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && newFileName.trim() !== '') {
-      console.log("📤 Sending FILE_CREATE packet for:", newFileName.trim()); // 🚨 ADD THIS
-      createFile(newFileName.trim());
+    if (e.key === 'Enter') {
+      e.preventDefault(); 
+      const fileName = newFileName.trim();
+      
+      if (fileName !== '') {
+        console.log("📤 Sending FILE_CREATE packet for:", fileName); 
+        createFile(fileName);
+        setActiveFile(fileName); 
+        requestLock(fileName, 'EXCLUSIVE');
+      }
+      
       setNewFileName("");
       setIsCreating(false);
     } else if (e.key === 'Escape') {
       setIsCreating(false);
+    }
+  };
+
+  const handleDelete = (e: React.MouseEvent, path: string) => {
+    e.stopPropagation(); // 🚨 CRITICAL: Prevents opening the file when clicking delete!
+    if (confirm(`Are you sure you want to delete "${path}" permanently?`)) {
+        deleteFile(path);
     }
   };
 
@@ -33,21 +48,32 @@ export default function FileExplorer() {
       <div key={node.path} className="ml-4 mt-1">
         <div 
           onClick={() => node.type === 'file' && setActiveFile(node.path)}
-          className={`flex items-center space-x-2 py-1 cursor-pointer rounded px-2 transition-colors ${
+          // added 'group' here so we can toggle button visibility smoothly on hover
+          className={`flex items-center space-x-2 py-1 cursor-pointer rounded px-2 transition-colors group ${
             isSelected 
               ? 'bg-blue-900/40 border-l-2 border-blue-500' 
               : 'hover:bg-gray-800 border-l-2 border-transparent'
           }`}
         >
           <span className="text-xs opacity-80">{node.type === 'folder' ? '📁' : '📄'}</span>
-          <span className={`text-sm truncate ${isSelected ? 'text-blue-400 font-semibold' : isLocked ? 'text-gray-500' : 'text-gray-300'}`}>
+          <span className={`text-sm truncate max-w-[120px] ${isSelected ? 'text-blue-400 font-semibold' : isLocked ? 'text-gray-500' : 'text-gray-300'}`}>
             {node.name}
           </span>
+          
           {isLocked && (
             <span className="text-[10px] bg-red-900/30 text-red-400 px-1 rounded border border-red-800/50 shrink-0 shadow-sm">
-              🔒 {owner}
+              🔒 {owner.substring(0, 7)}
             </span>
           )}
+
+          {/* 🗑️ Trashcan Icon Button (Hidden by default, becomes visible on node hover) */}
+          <button
+            onClick={(e) => handleDelete(e, node.path)}
+            className="ml-auto opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 text-xs transition-opacity duration-150 px-1"
+            title="Delete Permanently"
+          >
+            🗑️
+          </button>
         </div>
         {node.children?.map(renderNode)}
       </div>

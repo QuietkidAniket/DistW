@@ -21,8 +21,8 @@ struct UserSocketData {
 };
 
 /**
- * @brief This code has been compiled from various sources 
- * while being assisted by AI
+ * @brief Distributed Workspace WebSocket Router
+ * Handles all messaging channels and state synchronizations.
  */
 class WebSocketRouter {
 private:
@@ -66,17 +66,13 @@ public:
                 std::string session_id = "default";
                 std::string user_id = "anonymous";
 
-                // Expecting URL format: /session/{session_id}/user/{user_id}
                 if (tokens.size() >= 4 && tokens[0] == "session" && tokens[2] == "user") {
                     session_id = tokens[1];
                     user_id = tokens[3];
                 }
 
-                // Security Check: Look for an Authorization header
-                // @TEST Hardcoded to true for development testing
                 bool is_admin = true; 
 
-                // Commit the parsed data into the socket's memory block
                 res->template upgrade<UserSocketData>(
                     {user_id, session_id, is_admin},
                     req->getHeader("sec-websocket-key"),
@@ -100,8 +96,17 @@ public:
 
             .close = [this](auto *ws, int code, std::string_view message) {
                 UserSocketData* data = ws->getUserData();
-                // hdlm.release_all_locks_for_user(data->user_id);
-                std::cout << "User " << data->user_id << " disconnected.\n";
+                
+                // STICKY LOCK FIX: Wipe out their locks when they close the tab/disconnect
+                hdlm.release_all_locks_for_user(data->user_id);
+                std::cout << "User " << data->user_id << " disconnected. All locks released.\n";
+
+                // Broadcast the updated lock state immediately to remaining collaborators
+                json broadcast_payload = {
+                    {"type", "LOCK_SYNC"},
+                    {"active_locks", hdlm.get_all_active_locks()}
+                };
+                ws->publish(data->session_id, broadcast_payload.dump(), uWS::OpCode::TEXT);
             }
 
         }).listen(port, [port](auto *listen_socket) {
@@ -124,19 +129,15 @@ private:
             json payload = json::parse(raw_message);
             std::string type = payload.value("type", "");
 
-            // ROUTE 1: Text Synchronization (UPDATED FOR MONACO ARRAYS)
-            // ROUTE 1: Text Synchronization (UPDATED FOR MONACO ARRAYS & MEMORY)
+            // ROUTE 1: Text Synchronization (Monaco arrays + self-healing string)
             if (type == "DELTA") {
                 std::string full_text = payload.value("full_text", "");
                 std::string target_file = payload.value("file_path", "");
 
-                // 1. Save to memory AND check the HDLM lock simultaneously
                 if (delta_engine.force_state(data->user_id, target_file, full_text)) {
-                    // 2. If valid, broadcast visual changes to everyone else
                     std::string serialized = payload.dump();
                     ws->publish(data->session_id, serialized, uWS::OpCode::TEXT);
                 } else {
-                    // 3. Security failure / Desync! Force the UI to revert.
                     json revert = {
                         {"type", "STATE_REVERT"},
                         {"file_path", target_file},
@@ -146,7 +147,7 @@ private:
                 }
             }
             
-            // ROUTE 2: Lock Management
+            // ROUTE 2: Lock Management (Acquisition)
             else if (type == "LOCK_REQUEST") {
                 LockMode mode = (payload.value("mode", "") == "EXCLUSIVE") ? LockMode::EXCLUSIVE : LockMode::SHARED;
                 
@@ -165,23 +166,20 @@ private:
                 ws->send(response.dump(), uWS::OpCode::TEXT);
 
                 if (result == "ACQUIRED" || result == "ACQUIRED_BY_PREEMPTION") {
-                    // Fetch real locks from HDLM and let nlohmann::json auto-format it!
                     json broadcast_payload = {
                         {"type", "LOCK_SYNC"},
                         {"active_locks", hdlm.get_all_active_locks()} 
                     };
-                    
                     std::string sync_msg = broadcast_payload.dump();
-                    
                     ws->publish(data->session_id, sync_msg, uWS::OpCode::TEXT);
                     ws->send(sync_msg, uWS::OpCode::TEXT); 
                 }
             }
-            // ROUTE 2.5: Lock Release
+
+            // ROUTE 2.5: Lock Management (Release)
             else if (type == "LOCK_RELEASE") {
                 hdlm.release_lock(payload.value("file_path", ""), data->user_id);
                 
-                // Broadcast the updated lock state to everyone
                 json broadcast_payload = {
                     {"type", "LOCK_SYNC"},
                     {"active_locks", hdlm.get_all_active_locks()}
@@ -191,22 +189,21 @@ private:
                 ws->send(sync_msg, uWS::OpCode::TEXT);
             }
 
-            // ROUTE 3: Admin Preemption & Execution Sandbox
+            // ROUTE 3: Code Execution sandbox
             else if (type == "ADMIN_RUN") { 
                 std::string cpp_code = payload.value("code", ""); 
+                std::string stdin_data = payload.value("stdin", ""); // 🚨 NEW: Extract the input pane data
                 std::cout << "🚀 Execution started..." << std::endl;
 
-                std::string output = admin_pool.execute_code(cpp_code);
+                // 🚨 Pass the stdin_data into the execution pool
+                std::string output = admin_pool.execute_code(cpp_code, stdin_data);
                 
                 try {
                     json response = {
                         {"type", "RUN_OUTPUT"},
                         {"data", output}
                     };
-                    
-                    std::string serialized = response.dump();
-                    std::cout << "📤 Sending " << serialized.length() << " bytes to UI." << std::endl;
-                    ws->send(serialized, uWS::OpCode::TEXT);
+                    ws->send(response.dump(), uWS::OpCode::TEXT);
                 } catch (const std::exception& e) {
                     std::cerr << "❌ JSON Serialization failed: " << e.what() << std::endl;
                     ws->send("{\"type\":\"RUN_OUTPUT\",\"data\":\"[Server Error: Output contained invalid characters]\"}", uWS::OpCode::TEXT);
@@ -216,7 +213,6 @@ private:
             // ROUTE 4: File Content Request
             else if (type == "FILE_REQUEST") {
                 std::string target_file = payload.value("file_path", "");
-                
                 std::string content = delta_engine.generate_full_sync(target_file);
                 
                 json response = {
@@ -224,9 +220,18 @@ private:
                     {"file_path", target_file},
                     {"content", content}
                 };
-                
                 ws->send(response.dump(), uWS::OpCode::TEXT);
             }
+            
+            // ROUTE 5: File Tree Initialization
+            else if (type == "TREE_REQUEST") {
+                json response = {
+                    {"type", "TREE_SYNC"},
+                    {"tree", fs_manager.get_file_tree()}
+                };
+                ws->send(response.dump(), uWS::OpCode::TEXT);
+            }
+            
             // ROUTE 6: Create New File
             else if (type == "FILE_CREATE") {
                 std::string new_file = payload.value("file_path", "");
@@ -242,9 +247,38 @@ private:
                     ws->publish(data->session_id, msg, uWS::OpCode::TEXT);
                     ws->send(msg, uWS::OpCode::TEXT);
                 } else {
-                    std::cout << "❌ Failed to create file! (Already exists or bad permissions)" << std::endl;
+                    std::cout << "❌ Failed to create file!" << std::endl;
                 }
             }
+
+            // ROUTE 7: Real-Time Cursor Sync 🚨
+            else if (type == "CURSOR") {
+                // High-speed blind forward of typing coordinates to other session workers
+                ws->publish(data->session_id, raw_message, uWS::OpCode::TEXT);
+            }
+
+            // ROUTE 8: Delete File or Folder
+            else if (type == "FILE_DELETE") {
+                std::string target_path = payload.value("file_path", "");
+                std::cout << "🗑️ Request received to delete: " << target_path << std::endl;
+                
+                if (fs_manager.delete_file(target_path)) {
+                    std::cout << "✅ File deleted from disk. Cleaning memory systems..." << std::endl;
+                    hdlm.prune_path(target_path);
+                    
+                    json tree_msg = {{"type", "TREE_SYNC"}, {"tree", fs_manager.get_file_tree()}};
+                    json lock_msg = {{"type", "LOCK_SYNC"}, {"active_locks", hdlm.get_all_active_locks()}};
+                    
+                    ws->publish(data->session_id, tree_msg.dump(), uWS::OpCode::TEXT);
+                    ws->send(tree_msg.dump(), uWS::OpCode::TEXT);
+                    
+                    ws->publish(data->session_id, lock_msg.dump(), uWS::OpCode::TEXT);
+                    ws->send(lock_msg.dump(), uWS::OpCode::TEXT);
+                } else {
+                    std::cout << "❌ Failed to delete target path file off disk!" << std::endl;
+                }
+            }
+
         } catch (const json::exception& e) {
             std::cerr << "Malformed JSON packet dropped: " << e.what() << "\n";
         }

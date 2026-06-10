@@ -60,4 +60,14 @@ public:
         
         return success;
     }
+    // Forcefully removes files or entire folder directories recursively from disk
+    bool delete_file(const std::string& rel_path) {
+        fs::path full_path = fs::path(root_dir) / rel_path;
+        if (!fs::exists(full_path)) return false;
+        
+        std::error_code ec;
+        // remove_all ensures both empty/non-empty folders and files get deleted cleanly
+        fs::remove_all(full_path, ec); 
+        return !ec; 
+    }
 };

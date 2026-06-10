@@ -2,7 +2,6 @@
 #include <filesystem>
 #include <fstream>
 #include <string>
-#include <fstream>
 #include <memory>
 #include <array>
 
@@ -11,12 +10,14 @@ private:
     std::string admin_workspace = "/tmp/distw_admin_workspace/";
 
 public:
-        std::string execute_code(const std::string& cpp_code) {
+    //  stdin_data to the execution signature
+    std::string execute_code(const std::string& cpp_code, const std::string& stdin_data) {
         std::string workspace_dir = "/tmp/distw_admin_workspace";
         std::string file_path = workspace_dir + "/admin_temp.cpp";
         std::string exec_path = workspace_dir + "/a.out";
+        std::string input_path = workspace_dir + "/input.in"; // 🚨 Path for standard input data
 
-        // 1. Create directory and save file
+        // 1. Create directory and save C++ source file
         std::filesystem::create_directories(workspace_dir);
         std::ofstream out(file_path);
         if (!out.is_open()) {
@@ -24,6 +25,14 @@ public:
         }
         out << cpp_code;
         out.close();
+
+        //  1.5 Save the Standard Input payload to a file
+        std::ofstream in_file(input_path);
+        if (!in_file.is_open()) {
+            return "\x1b[31m[System Error]\x1b[0m Failed to create standard input file.\n";
+        }
+        in_file << stdin_data;
+        in_file.close();
 
         // Helper lambda to run a command and capture BOTH stdout and stderr
         auto run_cmd = [](const std::string& cmd) -> std::pair<int, std::string> {
@@ -40,7 +49,7 @@ public:
             return {status, result};
         };
 
-        // 2. Compile the code (Using clang++ based on your macOS error logs)
+        // 2. Compile the code (Using clang++ based on your macOS environment)
         std::string compile_cmd = "clang++ -std=c++17 " + file_path + " -o " + exec_path;
         auto [comp_status, comp_output] = run_cmd(compile_cmd);
 
@@ -49,8 +58,10 @@ public:
             return "\x1b[31m[Compilation Error]\x1b[0m\n" + comp_output;
         }
 
-        // 3. Execute the compiled binary
-        auto [run_status, run_output] = run_cmd(exec_path);
+        //  3. Execute the compiled binary with INPUT REDIRECTION
+        // The < operator streams the contents of input.in directly into std::cin
+        std::string run_command = exec_path + " < " + input_path;
+        auto [run_status, run_output] = run_cmd(run_command);
 
         // Visual feedback if the program runs but prints nothing
         if (run_output.empty()) {
