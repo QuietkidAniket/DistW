@@ -33,17 +33,16 @@ DistW tackles these challenges by shifting the paradigm from optimistic concurre
 ## System Architecture & Intricacies
 
 ### Backend Components (C++20 Core)
-* **`HierarchicalLockTree` (HDLM):** A custom Trie-based prefix tree that enforces pessimistic concurrency. It manages lock states at the file and folder levels, ensuring that a user cannot edit a file if someone else is actively working on it.
-* **`DeltaEngine`:** Powers bandwidth-efficient text synchronization. It utilizes a vectorized line buffer to achieve amortized **O(1) line-level insertions** and manages a lock-aware "Echo Killer" to prevent network latency from overwriting the active typist's local buffer.
-* **`AdminWarmPool`:** A thread-safe queue managing a pool of pre-booted Docker containers (`gcc:latest`). When a user runs code, the pool orchestrates isolated compilation and execution via `stdin/stdout` redirection.
-* **`ReaperEngine` & Shutdown Daemon:** Two distinct garbage collection mechanisms. The Session Sweeper runs asynchronously to purge disconnected TCP sockets and free RAM, while the Exit Daemon traps OS signals (`SIGINT`/`SIGTERM`) to gracefully wipe orphaned Docker containers upon server shutdown.
-* **`WebSocketRouter`:** The central nervous system built on `uWebSockets`, mapping raw network payloads to the corresponding backend engines.
+* **[`HierarchicalLockTree` (HDLM)](https://github.com/QuietkidAniket/DistW/blob/main/include/HierarchicalLockTree.hpp):** A custom Trie-based prefix tree that enforces pessimistic concurrency[cite: 1]. It manages lock states at the file and folder levels, ensuring that a user cannot edit a file if someone else is actively working on it[cite: 1].
+* **[`DeltaEngine`](https://github.com/QuietkidAniket/DistW/blob/main/include/DeltaEngine.hpp):** Powers bandwidth-efficient text synchronization[cite: 1]. It utilizes a vectorized line buffer to achieve amortized **O(1) line-level insertions** and manages a lock-aware "Echo Killer" to prevent network latency from overwriting the active typist's local buffer[cite: 1].
+* **[`AdminWarmPool`](https://github.com/QuietkidAniket/DistW/blob/main/include/AdminWarmPool.hpp):** A thread-safe queue managing a pool of pre-booted Docker containers (`gcc:latest`)[cite: 1]. When a user runs code, the pool orchestrates isolated compilation and execution via `stdin/stdout` redirection[cite: 1].
+* **[`ReaperEngine`](https://github.com/QuietkidAniket/DistW/blob/main/include/ReaperEngine.hpp) & [Shutdown Daemon](https://github.com/QuietkidAniket/DistW/blob/main/src/main.cpp):** Two distinct garbage collection mechanisms[cite: 1]. The Session Sweeper runs asynchronously to purge disconnected TCP sockets and free RAM, while the Exit Daemon traps OS signals (`SIGINT`/`SIGTERM`) to gracefully wipe orphaned Docker containers upon server shutdown[cite: 1].
+* **[`WebSocketRouter`](https://github.com/QuietkidAniket/DistW/blob/main/include/WebSocketRouter.hpp):** The central nervous system built on `uWebSockets`, mapping raw network payloads to the corresponding backend engines[cite: 1].
 
-* ### Frontend Components (React / TS)
-* **`EditorWorkspace`:** Wraps the Microsoft Monaco Editor. Integrates custom UI decorators for remote cursor tracking (Google Docs-style) and dynamically toggles read/write access based on WebSocket lock states.
-* **`ExecutionPanel`:** A resizable sidebar integrating `xterm.js` for authentic Unix terminal streaming, complete with a dual-pane Standard Input (`input.in`) and Standard Output (`stdout`) architecture.
-* **`AdminDashboard`:** A real-time telemetry overlay that polls the C++ server. It provides visual insights into Docker pool capacity, active distributed locks, and grants administrators the ability to remotely reboot containers or forcefully evict locked files.
-
+### Frontend Components (React / TS)
+* **[`EditorWorkspace`](https://github.com/QuietkidAniket/DistW/blob/main/distw-ui/src/components/EditorWorkspace.tsx):** Wraps the Microsoft Monaco Editor[cite: 1]. Integrates custom UI decorators for remote cursor tracking (Google Docs-style) and dynamically toggles read/write access based on WebSocket lock states[cite: 1].
+* **[`ExecutionPanel`](https://github.com/QuietkidAniket/DistW/blob/main/distw-ui/src/components/ExecutionPanel.tsx):** A resizable sidebar integrating `xterm.js` for authentic Unix terminal streaming, complete with a dual-pane Standard Input (`input.in`) and Standard Output (`stdout`) architecture[cite: 1].
+* **[`AdminDashboard`](https://github.com/QuietkidAniket/DistW/blob/main/distw-ui/src/components/AdminDashboard.tsx):** A real-time telemetry overlay that polls the C++ server. It provides visual insights into Docker pool capacity, active distributed locks, and grants administrators the ability to remotely reboot containers or forcefully evict locked files.
 
 ### Architecture Diagram
 
