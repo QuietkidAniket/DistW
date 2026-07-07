@@ -26,7 +26,7 @@ DistW tackles these challenges by shifting the paradigm from optimistic concurre
 * **High-Performance Networking:** Asynchronous I/O multiplexing, TCP/WebSockets via `uWebSockets`.
 * **Concurrency & Synchronization:** Custom lock managers, thread-safe queues, race-condition mitigation.
 * **DevOps & Security:** Docker container orchestration, process sandboxing, resource capping (cgroups).
-* **Frontend Engineering:** React, TypeScript, Zustand (State Management), Monaco Editor integration, XTerm.js.
+* **Frontend Engineering:** React, TypeScript, Zustand (State Management), Monaco Editor integration, XTerm.js (I mainly used AI generated future-proof code for frontend as this is something i do not specialise in)
 
 ---
 
@@ -68,7 +68,7 @@ flowchart TB
         WS((uWebSockets\nAsync I/O Multiplexer)):::network
     end
 
-    subgraph Server [DistW C++20 Edge Server]
+    subgraph Server [DistW C++20 Server Node]
         Router[WebSocketRouter\nCentral Dispatcher]:::router
         
         subgraph StateManagement [Concurrency & State Engine]
@@ -140,3 +140,35 @@ mkdir build && cd build
 cmake ..
 cmake --build .
 ./DistWServer
+```
+
+### Booting the Frontend UI (React / TypeScript)
+The client-side application is isolated within the `distw-ui` directory. It uses Vite for lightning-fast Hot Module Replacement (HMR).
+
+**1. Navigate to the frontend directory:**
+```bash
+cd distw-ui
+
+```
+
+**2. Install the necessary Node dependencies:**
+
+```bash
+npm install
+
+```
+
+**3. Start the Vite development server:**
+
+```bash
+npm run dev
+
+```
+
+> **Note:** The Vite server will typically start on `http://localhost:5173`. Ensure the C++ edge server is already running on port `9001` so the WebSocket connection can be established immediately upon loading the page.
+
+
+
+
+
+
