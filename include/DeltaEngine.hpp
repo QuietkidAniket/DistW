@@ -36,7 +36,7 @@ public:
         return true; 
     }
 
-    // 🚨 NEW METHOD: Directly overwrites the file state from the Master UI
+    // Directly overwrites the file state from the Master UI
     bool force_state(const std::string& user_id, const std::string& path, const std::string& full_text) {
         // STEP 1: Security Gate (Ensure they actually hold the write lock!)
         if (!hdlm.is_exclusive_owner(path, user_id)) {
