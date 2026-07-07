@@ -34,7 +34,8 @@ Under the hood, DistW solves two critical distributed systems challenges:
 * **High-Performance Networking:** Asynchronous I/O multiplexing, TCP/WebSockets via `uWebSockets`.
 * **Concurrency & Synchronization:** Custom lock managers, thread-safe queues, race-condition mitigation.
 * **DevOps & Security:** Docker container orchestration, process sandboxing, resource capping (cgroups).
-* **Frontend Engineering:** React, TypeScript, Zustand (State Management), Monaco Editor integration, XTerm.js (I mainly used AI generated future-proof code for frontend as this is something i do not specialise in)
+* **Frontend Engineering:** React, TypeScript, Zustand (State Management), Monaco Editor integration, XTerm.js
+  (NOTE: For frontend, I mainly used AI generated up-to-date code as this is something i do not specialise in)
 
 ---
 
