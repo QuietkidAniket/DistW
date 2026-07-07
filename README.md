@@ -1,10 +1,6 @@
 # DistW 
 ## High-Performance Distributed Collaborative IDE
 
-DistW is a real-time, hybrid-edge collaborative Integrated Development Environment (IDE) built for low-latency synchronization and secure remote code execution. 
-
-Engineered from the ground up with a **C++20 backend** and a **React/TypeScript frontend**, DistW solves the complexities of multi-user concurrency, network efficiency, and untrusted code sandboxing through custom-built systems like a Hierarchical Distributed Lock Manager and a pre-warmed Docker pool.
-
 ---
 
 ## Why DistW?
@@ -13,13 +9,25 @@ Building a collaborative code editor presents three massive engineering challeng
 2. **Network Bottlenecks:** Sending entire file states over a WebSocket on every keystroke cripples bandwidth and causes synchronization latency. 
 3. **Malicious Code Execution:** Allowing users to compile and run C++ code remotely exposes the host server to infinite loops, RAM exhaustion, and fork bombs.
 
-## What it does:
-DistW tackles these challenges by shifting the paradigm from optimistic concurrency to **pessimistic concurrency** and strict container orchestration:
-* **Pessimistic Locking:** Instead of merging conflicting edits, DistW uses a Trie-based Hierarchical Lock Manager to grant granular, atomic write-locks on files. Only the lock owner can edit, mathematically guaranteeing zero merge conflicts.
+## How to tackle these issues ?
+* **Pessimistic Locking:** Instead of merging conflicting edits, we use a Trie-based Hierarchical Lock Manager to grant granular, atomic write-locks on files. Only the lock owner can edit, mathematically guaranteeing zero merge conflicts.
 * **O(1) Delta Engine:** Text is synchronized using a vectorized line-buffer architecture, broadcasting only the exact line changes rather than full payloads.
 * **Hardened Sandbox:** User code is injected into pre-warmed Docker containers with strict CPU, Memory, and PID limits, achieving sub-300ms "cold start" execution times while keeping the host server 100% secure.
 
----
+
+# So what is DistW actually?
+
+DistW is a full-stack, distributed collaborative Integrated Development Environment (IDE) engineered for ultra-low-latency state synchronization and secure Remote Code Execution (RCE). 
+
+Designed for high-throughput concurrent developer sessions, DistW explicitly bypasses the memory bloat and computational overhead of traditional state-reconciliation algorithms like Operational Transformation (OT) or CRDTs. Instead, it enforces strict **pessimistic concurrency** via a custom **Trie-based Hierarchical Distributed Lock Manager (HDLM)**, mathematically guaranteeing atomic data integrity and zero merge conflicts at the file and directory levels.
+
+The architecture bridges a highly concurrent **C++20 edge server** (leveraging `uWebSockets` for event-driven, asynchronous I/O multiplexing) with a **React/TypeScript frontend** wrapping the Monaco Editor. 
+
+Under the hood, DistW solves two critical distributed systems challenges:
+1. **Network-Efficient State Sync:** A custom **Delta Engine** utilizing vectorized line buffers achieves amortized **O(1) line-level insertions**, broadcasting only differential keystroke payloads to remote clients rather than full file states.
+2. **Hardened Remote Execution:** A multi-threaded **Admin Warm Pool** daemon orchestrates a fleet of pre-booted Docker containers. This allows untrusted user code to be routed, compiled, and executed with **sub-300ms latency**, while strictly enforcing cgroup resource limits (CPU, RAM, PIDs) to protect the host machine from malicious exhaustion attacks.
+
+--- 
 
 ## What I learnt and applied on the go:
 * **Systems Programming:** C++20, Multi-threading (jthreads, mutexes, atomics), POSIX Systems.
