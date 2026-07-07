@@ -206,7 +206,8 @@ private:
                     };
                     ws->send(response.dump(), uWS::OpCode::TEXT);
                 } catch (const std::exception& e) {
-                    std::cerr << "❌ JSON Serialization failed: " << e.what() << std::endl;
+                    // for debugging purposes
+                    // std::cerr << "❌ JSON Serialization failed: " << e.what() << std::endl;
                     ws->send("{\"type\":\"RUN_OUTPUT\",\"data\":\"[Server Error: Output contained invalid characters]\"}", uWS::OpCode::TEXT);
                 }
             }
@@ -239,7 +240,8 @@ private:
                 std::cout << "📁 Request received to create: " << new_file << std::endl;
                 
                 if (fs_manager.create_file(new_file)) {
-                    std::cout << "✅ File created on disk! Broadcasting new tree..." << std::endl;
+                    // for debugging purposes
+                    std::cout << " File created on disk! Broadcasting new tree..." << std::endl;
                     json broadcast = {
                         {"type", "TREE_SYNC"},
                         {"tree", fs_manager.get_file_tree()}
