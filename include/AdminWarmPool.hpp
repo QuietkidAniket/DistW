@@ -15,7 +15,7 @@ public:
         std::string workspace_dir = "/tmp/distw_admin_workspace";
         std::string file_path = workspace_dir + "/admin_temp.cpp";
         std::string exec_path = workspace_dir + "/a.out";
-        std::string input_path = workspace_dir + "/input.in"; // 🚨 Path for standard input data
+        std::string input_path = workspace_dir + "/input.in"; // Path for standard input data
 
         // 1. Create directory and save C++ source file
         std::filesystem::create_directories(workspace_dir);
@@ -49,7 +49,7 @@ public:
             return {status, result};
         };
 
-        // 2. Compile the code (Using clang++ based on your macOS environment)
+        // 2. Compile the code (Using clang++ based on my own macOS environment, may replace )
         std::string compile_cmd = "clang++ -std=c++17 " + file_path + " -o " + exec_path;
         auto [comp_status, comp_output] = run_cmd(compile_cmd);
 
