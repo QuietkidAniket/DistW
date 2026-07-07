@@ -192,10 +192,11 @@ private:
             // ROUTE 3: Code Execution sandbox
             else if (type == "ADMIN_RUN") { 
                 std::string cpp_code = payload.value("code", ""); 
-                std::string stdin_data = payload.value("stdin", ""); // 🚨 NEW: Extract the input pane data
-                std::cout << "🚀 Execution started..." << std::endl;
+                std::string stdin_data = payload.value("stdin", ""); //  Extract the input pane data
+                // For debugging purposes
+                // std::cout << " Execution started..." << std::endl;
 
-                // 🚨 Pass the stdin_data into the execution pool
+                // Pass the stdin_data into the execution pool
                 std::string output = admin_pool.execute_code(cpp_code, stdin_data);
                 
                 try {
@@ -260,10 +261,12 @@ private:
             // ROUTE 8: Delete File or Folder
             else if (type == "FILE_DELETE") {
                 std::string target_path = payload.value("file_path", "");
-                std::cout << "🗑️ Request received to delete: " << target_path << std::endl;
+                // for debugging purposes
+                //std::cout <<  Request received to delete: " << target_path << std::endl;
                 
                 if (fs_manager.delete_file(target_path)) {
-                    std::cout << "✅ File deleted from disk. Cleaning memory systems..." << std::endl;
+                    // for debugging purposes
+                    // std::cout << File deleted from disk. Cleaning memory systems..." << std::endl;
                     hdlm.prune_path(target_path);
                     
                     json tree_msg = {{"type", "TREE_SYNC"}, {"tree", fs_manager.get_file_tree()}};
@@ -275,12 +278,14 @@ private:
                     ws->publish(data->session_id, lock_msg.dump(), uWS::OpCode::TEXT);
                     ws->send(lock_msg.dump(), uWS::OpCode::TEXT);
                 } else {
-                    std::cout << "❌ Failed to delete target path file off disk!" << std::endl;
+                    // for debugging purposes
+                    // std::cout << "❌ Failed to delete target path file off disk!" << std::endl;
                 }
             }
 
         } catch (const json::exception& e) {
-            std::cerr << "Malformed JSON packet dropped: " << e.what() << "\n";
+            // for debugging purposes
+            // std::cerr << "Malformed JSON packet dropped: " << e.what() << "\n";
         }
     }
 };
